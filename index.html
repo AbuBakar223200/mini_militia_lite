@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mini Militia Lite</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="1600" height="900"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="playerCard">
+      <div class="barRow"><span class="lbl">HP</span><div class="bar"><div id="healthFill" class="fill hp" style="width:100%"></div></div></div>
+      <div class="barRow"><span class="lbl">JET</span><div class="bar"><div id="fuelFill" class="fill fuel" style="width:100%"></div></div></div>
+      <div id="weaponRow">
+        <span id="weaponText">Rifle</span>
+        <span id="ammoText">30 / 30</span>
+        <span id="grenText">&#10022; 2</span>
+      </div>
+    </div>
+
+    <div id="scoreStrip"></div>
+
+    <div id="rightPanel">
+      <canvas id="minimap" width="180" height="105"></canvas>
+      <div id="killFeed"></div>
+    </div>
+
+    <div id="hintBar">A/D move &middot; W jetpack &middot; S fast-fall &middot; ARROWS aim &middot; SPACE/J or CLICK shoot &middot; K grenade &middot; R reload &middot; TAB scores &middot; P pause &middot; M mute</div>
+
+    <div id="deathOverlay" class="hidden"><div id="deathText">RESPAWNING&hellip;</div></div>
+
+    <div id="scoreboard" class="hidden"><table id="sbTable"></table></div>
+  </div>
+
+  <div id="startMenu" class="menu">
+    <h1>MINI MILITIA <span>LITE</span></h1>
+    <p class="tag">Jetpack deathmatch arena &mdash; first to 15 frags wins</p>
+    <div class="controls">
+      <div><b>A / D</b> Move</div>
+      <div><b>W</b> Jetpack</div>
+      <div><b>S</b> Fast fall</div>
+      <div><b>&larr; &uarr; &darr; &rarr;</b> Aim</div>
+      <div><b>SPACE / J</b> Shoot</div>
+      <div><b>K</b> Grenade</div>
+      <div><b>R</b> Reload</div>
+      <div><b>TAB</b> Scoreboard</div>
+      <div><b>P / ESC</b> Pause</div>
+      <div><b>MOUSE</b> Optional aim + fire</div>
+      <div><b>M</b> Mute</div>
+      <div><b>ENTER</b> Play</div>
+    </div>
+    <div class="diffRow">
+      <button class="diffBtn" data-diff="easy">EASY</button>
+      <button class="diffBtn selected" data-diff="normal">NORMAL</button>
+      <button class="diffBtn" data-diff="hard">HARD</button>
+    </div>
+    <button id="playBtn" class="bigBtn">&#9654; PLAY SOLO</button>
+    <div class="mpDivider"><span>OR PLAY ONLINE WITH FRIENDS</span></div>
+    <input id="nameInput" class="mpInput" placeholder="Your name" maxlength="12" autocomplete="off">
+    <div class="mpRow">
+      <button id="hostBtn" class="bigBtn alt">&#127760; HOST GAME</button>
+      <button id="joinBtn" class="bigBtn alt">&#128279; JOIN GAME</button>
+    </div>
+  </div>
+
+  <div id="hostPanel" class="menu hidden">
+    <h2>HOSTING A ROOM</h2>
+    <p class="tag">Share this code with your friends:</p>
+    <div id="roomCode" class="roomCode">-----</div>
+    <div class="lobbyBox">
+      <div class="lobbyTitle">PLAYERS</div>
+      <div id="lobbyList" class="lobbyList"></div>
+      <div class="lobbyTitle">BOTS</div>
+      <div class="diffRow" id="botRow">
+        <button class="diffBtn botBtn" data-bots="0">0</button>
+        <button class="diffBtn botBtn" data-bots="1">1</button>
+        <button class="diffBtn botBtn selected" data-bots="2">2</button>
+        <button class="diffBtn botBtn" data-bots="3">3</button>
+        <button class="diffBtn botBtn" data-bots="4">4</button>
+      </div>
+      <div class="lobbyTitle">BOT SKILL</div>
+      <div class="diffRow" id="mpDiffRow">
+        <button class="diffBtn mpDiffBtn" data-diff="easy">EASY</button>
+        <button class="diffBtn mpDiffBtn selected" data-diff="normal">NORMAL</button>
+        <button class="diffBtn mpDiffBtn" data-diff="hard">HARD</button>
+      </div>
+    </div>
+    <button id="startMpBtn" class="bigBtn">&#9654; START MATCH</button>
+    <button id="hostBackBtn" class="bigBtn alt">BACK</button>
+  </div>
+
+  <div id="joinPanel" class="menu hidden">
+    <h2>JOIN A ROOM</h2>
+    <input id="codeInput" class="mpInput codeInput" placeholder="ROOM CODE" maxlength="5" autocomplete="off">
+    <button id="connectBtn" class="bigBtn">CONNECT</button>
+    <div id="joinStatus" class="tag"></div>
+    <button id="joinBackBtn" class="bigBtn alt">BACK</button>
+  </div>
+
+  <div id="mpBanner" class="hidden"></div>
+
+  <div id="pauseMenu" class="menu hidden">
+    <h2>PAUSED</h2>
+    <button id="resumeBtn" class="bigBtn">RESUME</button>
+    <button id="restartBtn" class="bigBtn alt">RESTART</button>
+    <button id="quitBtn" class="bigBtn alt">MAIN MENU</button>
+  </div>
+
+  <div id="endMenu" class="menu hidden">
+    <h1 id="endTitle">VICTORY</h1>
+    <p id="endSub" class="tag"></p>
+    <table id="endTable"></table>
+    <p id="waitHost" class="tag hidden">Waiting for the host&hellip;</p>
+    <button id="againBtn" class="bigBtn">&#9654; PLAY AGAIN</button>
+    <button id="menuBtn" class="bigBtn alt">MAIN MENU</button>
+  </div>
+
+  <div id="errBox" class="hidden">ERROR: <span id="errText"></span></div>
+</div>
+
+<script src="peerjs.min.js"></script>
+<script src="audio.js"></script>
+<script src="levels.js"></script>
+<script src="input.js"></script>
+<script src="entities.js"></script>
+<script src="net.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#05070d;overflow:hidden}
+body{font-family:'Segoe UI',system-ui,sans-serif;color:#eaf2ff}
+#wrap{position:absolute;left:50%;top:50%;width:1600px;height:900px;background:#000}
+#game{display:block;width:1600px;height:900px;border-radius:8px}
+.hidden{display:none!important}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:0;pointer-events:none}
+#playerCard{position:absolute;top:14px;left:16px;background:rgba(8,14,26,.62);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px 14px;min-width:250px}
+.barRow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.lbl{font-size:11px;font-weight:700;width:28px;color:#9fb8d8;letter-spacing:.5px}
+.bar{flex:1;height:13px;background:rgba(0,0,0,.55);border-radius:7px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
+.fill{height:100%;border-radius:7px;transition:width .08s linear}
+.fill.hp{background:linear-gradient(90deg,#43a047,#66bb6a)}
+.fill.fuel{background:linear-gradient(90deg,#fb8c00,#ffb300)}
+#weaponRow{display:flex;gap:12px;font-size:13px;margin-top:2px}
+#weaponText{font-weight:700;color:#ffd54f}
+#ammoText{color:#cfd8dc;font-variant-numeric:tabular-nums}
+#grenText{color:#ffe082}
+
+#scoreStrip{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:rgba(8,14,26,.55);padding:6px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12)}
+.chip{display:flex;align-items:center;gap:5px;font-size:12px;color:#cfe3ff;background:rgba(255,255,255,.06);padding:2px 8px;border-radius:20px;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.chip b{color:#fff}
+.chip.me{outline:1px solid #42a5f5;background:rgba(66,165,243,.18)}
+.limit{font-size:10px;color:#8fa8c9;letter-spacing:1px;margin-left:4px;white-space:nowrap}
+
+#rightPanel{position:absolute;top:14px;right:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+#minimap{border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(8,14,26,.5)}
+#killFeed{display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:300px}
+.feedItem{background:rgba(8,14,26,.72);border:1px solid rgba(255,255,255,.12);padding:4px 10px;border-radius:8px;font-size:12.5px;animation:pop .18s ease-out;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.feedItem.fade{opacity:0;transition:opacity .5s}
+@keyframes pop{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+#hintBar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:12px;color:#d7e6ff;background:rgba(8,14,26,.55);padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.1);transition:opacity 1s;white-space:nowrap}
+#deathOverlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(120,10,10,.18)}
+#deathText{font-size:42px;font-weight:800;color:#ff8a80;text-shadow:0 2px 14px rgba(0,0,0,.7);letter-spacing:2px}
+
+#scoreboard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(8,14,26,.9);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px 26px}
+#scoreboard table,#endTable{border-collapse:collapse}
+th,td{padding:6px 18px;font-size:14px;text-align:left}
+th{color:#8fa8c9;font-size:11px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.15)}
+tr.me td{color:#4fc3f7;font-weight:700}
+
+/* ---------- Menus ---------- */
+.menu{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(1200px 700px at 50% 30%,rgba(20,40,80,.88),rgba(4,8,16,.94));z-index:10}
+.menu h1{font-size:64px;font-weight:900;letter-spacing:3px;background:linear-gradient(180deg,#fff,#7fb3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.menu h1 span{background:linear-gradient(180deg,#ffd54f,#ff8f00);-webkit-background-clip:text;background-clip:text;color:transparent}
+.menu h2{font-size:40px;font-weight:800;letter-spacing:3px;color:#cfe3ff}
+.tag{color:#a9c1e0;font-size:16px}
+.controls{display:grid;grid-template-columns:repeat(3,auto);gap:8px 26px;background:rgba(8,14,26,.6);border:1px solid rgba(255,255,255,.12);padding:16px 26px;border-radius:14px;font-size:13.5px;color:#cfe3ff}
+.controls b{color:#ffd54f;display:inline-block;min-width:86px}
+.diffRow{display:flex;gap:12px}
+.diffBtn{padding:10px 26px;border-radius:10px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#cfe3ff;font-weight:700;cursor:pointer;font-size:14px;letter-spacing:1px}
+.diffBtn:hover{background:rgba(255,255,255,.14)}
+.diffBtn.selected{border-color:#42a5f5;background:rgba(66,165,243,.25);color:#fff;box-shadow:0 0 18px rgba(66,165,243,.4)}
+.bigBtn{padding:14px 60px;font-size:20px;font-weight:800;letter-spacing:2px;border:none;border-radius:12px;background:linear-gradient(180deg,#42a5f5,#1976d2);color:#fff;cursor:pointer;box-shadow:0 6px 22px rgba(25,118,210,.45)}
+.bigBtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.bigBtn.alt{background:rgba(255,255,255,.1);box-shadow:none;font-size:15px;padding:11px 34px}
+.bigBtn:active{transform:translateY(1px)}
+#endTable{background:rgba(8,14,26,.6);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 18px}
+
+#errBox{position:absolute;bottom:8px;left:8px;background:#b71c1c;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;z-index:99;max-width:60%}
+
+/* ---------- Multiplayer ---------- */
+.mpDivider{display:flex;align-items:center;gap:12px;color:#6f8bab;font-size:11px;letter-spacing:2px;width:420px}
+.mpDivider::before,.mpDivider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.15)}
+.mpInput{background:rgba(8,14,26,.7);border:1px solid rgba(255,255,255,.25);border-radius:10px;color:#eaf2ff;font-size:16px;font-weight:600;padding:10px 16px;text-align:center;width:220px;outline:none}
+.mpInput:focus{border-color:#42a5f5;box-shadow:0 0 14px rgba(66,165,243,.35)}
+.codeInput{width:260px;font-size:26px;letter-spacing:10px;text-transform:lowercase;font-weight:800}
+.mpRow{display:flex;gap:14px}
+.roomCode{font-size:52px;font-weight:900;letter-spacing:14px;color:#ffd54f;background:rgba(8,14,26,.6);border:1px solid rgba(255,213,79,.4);padding:10px 20px 10px 34px;border-radius:14px;user-select:all;text-shadow:0 0 24px rgba(255,213,79,.35)}
+.lobbyBox{background:rgba(8,14,26,.6);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px 22px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:340px}
+.lobbyTitle{font-size:10px;letter-spacing:2px;color:#8fa8c9}
+.lobbyList{display:flex;flex-direction:column;gap:3px;align-items:center;min-height:40px;font-size:14px;font-weight:700}
+#mpBanner{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(8,14,26,.85);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 18px;font-size:14px;font-weight:700;color:#ffe082;z-index:20;pointer-events:none}
+
