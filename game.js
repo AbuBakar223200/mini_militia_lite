@@ -8,17 +8,47 @@
   const $ = id => document.getElementById(id);
   const wrap = $('wrap');
 
-  // ---------- scaling ----------
+  // ---------- view / scaling ----------
+  // Internal render resolution adapts to the screen aspect so the game is
+  // full-bleed on phones (landscape) and desktops alike. Game logic uses these units.
+  const VIEW = { w: VIEW_W, h: VIEW_H, rs: 1 };
+  window.VIEW = VIEW;
+
+  function isTouchDevice() {
+    return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  }
+  let touchPref = isTouchDevice();
+
+  function createGradients() {
+    skyGrad = ctx.createLinearGradient(0, 0, 0, VIEW.h);
+    skyGrad.addColorStop(0, '#6ec6ff');
+    skyGrad.addColorStop(0.55, '#b3e5fc');
+    skyGrad.addColorStop(1, '#e3f6fd');
+    vignette = ctx.createRadialGradient(VIEW.w / 2, VIEW.h / 2, VIEW.h * 0.45, VIEW.w / 2, VIEW.h / 2, VIEW.h * 0.9);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.32)');
+  }
+
   function fit() {
-    const s = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H);
+    const ww = Math.max(320, window.innerWidth), wh = Math.max(320, window.innerHeight);
+    const h = touchPref ? 720 : 900;
+    const w = clamp(Math.round(h * ww / wh), 780, 1920);
+    VIEW.w = w; VIEW.h = h;
+    VIEW.rs = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(w * VIEW.rs);
+    canvas.height = Math.round(h * VIEW.rs);
+    wrap.style.width = w + 'px';
+    wrap.style.height = h + 'px';
+    const s = Math.min(ww / w, wh / h);
     wrap.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+    createGradients();
   }
   window.addEventListener('resize', fit);
-  fit();
+  window.addEventListener('orientationchange', () => setTimeout(fit, 120));
 
   // ---------- state ----------
   const state = { mode: 'menu', frame: 0, diff: 'normal', shake: 0, aimFrom: 'mouse', hintT: 600, mpBots: 2, mpDiff: 'normal' };
-  const cam = { x: 0, y: WORLD.h - VIEW_H };
+  const cam = { x: 0, y: WORLD.h - VIEW.h };
   let player = null, winner = null, matchT = 0, selectedDiff = 'normal';
   let clientAim = 0;
   const clientCounters = { s: 0, g: 0, r: 0 };
@@ -142,8 +172,8 @@
       bot.id = 100 + i;
       G.bodies.push(bot);
     }
-    cam.x = clamp(player.cx - VIEW_W / 2, 0, WORLD.w - VIEW_W);
-    cam.y = clamp(player.cy - VIEW_H / 2, 0, WORLD.h - VIEW_H);
+    cam.x = clamp(player.cx - VIEW.w / 2, 0, WORLD.w - VIEW.w);
+    cam.y = clamp(player.cy - VIEW.h / 2, 0, WORLD.h - VIEW.h);
     matchT = 0; winner = null;
     G.frame = 0;
     state.mode = 'playing';
@@ -157,13 +187,15 @@
     $('hud').classList.remove('hidden');
     $('killFeed').innerHTML = '';
     AudioSys.ensure();
-    if (isMp) { Net.broadcastGo(); Net.sendLobby(); }
+    if (Net.mode === 'host') { Net.broadcastGo(); Net.sendLobby(); }
+    $('touchUI').classList.remove('hidden');
   }
 
   function toMenu() {
     state.mode = 'menu';
     AudioSys.jetStop();
     $('hud').classList.add('hidden');
+    $('touchUI').classList.add('hidden');
     $('pauseMenu').classList.add('hidden');
     $('endMenu').classList.add('hidden');
     $('deathOverlay').classList.add('hidden');
@@ -235,6 +267,10 @@
       player.aimAngle = Math.atan2(ay, ax);
       aimed = true;
       state.aimFrom = 'keys';
+    } else if (Input.touch.aiming) {
+      player.aimAngle = Math.atan2(Input.touch.ay, Input.touch.ax);
+      aimed = true;
+      state.aimFrom = 'keys';
     } else if (mouseActive) {
       const wx = m.x + cam.x, wy = m.y + cam.y;
       const dx = wx - player.cx, dy = wy - player.cy;
@@ -298,8 +334,8 @@
     // camera
     const leadX = Math.cos(player.aimAngle) * 50;
     const leadY = Math.sin(player.aimAngle) * 30;
-    const tx = clamp(player.cx + leadX - VIEW_W / 2, 0, WORLD.w - VIEW_W);
-    const ty = clamp(player.cy - 40 + leadY - VIEW_H / 2, 0, WORLD.h - VIEW_H);
+    const tx = clamp(player.cx + leadX - VIEW.w / 2, 0, WORLD.w - VIEW.w);
+    const ty = clamp(player.cy - 40 + leadY - VIEW.h / 2, 0, WORLD.h - VIEW.h);
     cam.x += (tx - cam.x) * 0.12;
     cam.y += (ty - cam.y) * 0.12;
     state.shake *= 0.88;
@@ -336,8 +372,8 @@
       const s = view.self;
       if (s) {
         const leadX = Math.cos(clientAim) * 50, leadY = Math.sin(clientAim) * 30;
-        const tx = clamp(s.cx + leadX - VIEW_W / 2, 0, WORLD.w - VIEW_W);
-        const ty = clamp(s.cy - 40 + leadY - VIEW_H / 2, 0, WORLD.h - VIEW_H);
+        const tx = clamp(s.cx + leadX - VIEW.w / 2, 0, WORLD.w - VIEW.w);
+        const ty = clamp(s.cy - 40 + leadY - VIEW.h / 2, 0, WORLD.h - VIEW.h);
         cam.x += (tx - cam.x) * 0.12;
         cam.y += (ty - cam.y) * 0.12;
       }
@@ -366,6 +402,7 @@
       const mouseActive = (performance.now() - m.lastMove < 2500) || m.down;
       let aimed = false;
       if (ax || ay) { inp.a = Math.atan2(ay, ax); aimed = true; state.aimFrom = 'keys'; }
+      else if (Input.touch.aiming) { inp.a = Math.atan2(Input.touch.ay, Input.touch.ax); aimed = true; state.aimFrom = 'keys'; }
       else if (mouseActive) {
         const wx = m.x + cam.x, wy = m.y + cam.y;
         const dx = wx - self.cx, dy = wy - self.cy;
@@ -443,6 +480,7 @@
     $('mpBanner').classList.add('hidden');
     $('waitHost').classList.add('hidden');
     $('hud').classList.remove('hidden');
+    $('touchUI').classList.remove('hidden');
     $('killFeed').innerHTML = '';
     matchT = 0;
     state.hintT = 600;
@@ -512,26 +550,20 @@
   }
 
   // ---------- rendering ----------
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-  skyGrad.addColorStop(0, '#6ec6ff');
-  skyGrad.addColorStop(0.55, '#b3e5fc');
-  skyGrad.addColorStop(1, '#e3f6fd');
-  const vignette = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.45, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.9);
-  vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(0,0,0,0.32)');
+  let skyGrad = null, vignette = null;
 
   function drawHills(parallax, baseY, amp, color, seed) {
     const ox = cam.x * parallax;
     const oy = cam.y * parallax * 0.5;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(0, VIEW_H);
-    for (let x = 0; x <= VIEW_W; x += 32) {
+    ctx.moveTo(0, VIEW.h);
+    for (let x = 0; x <= VIEW.w; x += 32) {
       const wx = x + ox;
       const y = baseY - oy + Math.sin(wx * 0.004 + seed) * amp + Math.sin(wx * 0.011 + seed * 2) * amp * 0.45;
       ctx.lineTo(x, y);
     }
-    ctx.lineTo(VIEW_W, VIEW_H);
+    ctx.lineTo(VIEW.w, VIEW.h);
     ctx.closePath();
     ctx.fill();
   }
@@ -553,21 +585,22 @@
 
   function render() {
     const now = performance.now();
+    ctx.setTransform(VIEW.rs, 0, 0, VIEW.rs, 0, 0);
     // sky
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, VIEW.w, VIEW.h);
     // sun
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = '#fff59d';
-    ctx.beginPath(); ctx.arc(VIEW_W - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 70, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(VIEW.w - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 70, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#fff9c4';
-    ctx.beginPath(); ctx.arc(VIEW_W - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 44, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(VIEW.w - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 44, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     drawClouds(now);
-    drawHills(0.25, VIEW_H * 0.62, 55, '#b7d9a8', 1.7);
-    drawHills(0.45, VIEW_H * 0.78, 75, '#93c47d', 4.2);
+    drawHills(0.25, VIEW.h * 0.62, 55, '#b7d9a8', 1.7);
+    drawHills(0.45, VIEW.h * 0.78, 75, '#93c47d', 4.2);
 
     // world space
     const sx = (Math.random() * 2 - 1) * state.shake;
@@ -672,17 +705,17 @@
       ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(20,40,80,0.8)';
       ctx.lineWidth = 8;
-      ctx.strokeText('FIGHT!', VIEW_W / 2, VIEW_H / 2 - 30);
-      ctx.fillText('FIGHT!', VIEW_W / 2, VIEW_H / 2 - 30);
+      ctx.strokeText('FIGHT!', VIEW.w / 2, VIEW.h / 2 - 30);
+      ctx.fillText('FIGHT!', VIEW.w / 2, VIEW.h / 2 - 30);
       ctx.font = '600 22px Segoe UI, sans-serif';
       ctx.fillStyle = '#e3f2fd';
-      ctx.fillText('FIRST TO ' + KILL_LIMIT + ' KILLS', VIEW_W / 2, VIEW_H / 2 + 16);
+      ctx.fillText('FIRST TO ' + KILL_LIMIT + ' KILLS', VIEW.w / 2, VIEW.h / 2 + 16);
       ctx.globalAlpha = 1;
     }
 
     // vignette
     ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, VIEW.w, VIEW.h);
 
     // minimap
     if (state.mode !== 'menu') drawMinimap(V);
@@ -877,6 +910,133 @@
     startGame, checkWin,
   };
 
+  // ---------- touch controls ----------
+  function applyTouchMode() {
+    document.body.classList.toggle('touchOn', touchPref);
+    const t = $('touchToggle');
+    if (t) t.textContent = touchPref
+      ? (isTouchDevice() ? '\uD83D\uDCF1 TOUCH CONTROLS: ON' : '\uD83D\uDCF1 TOUCH CONTROLS: FORCED ON')
+      : '\uD83D\uDCF1 TOUCH CONTROLS: OFF';
+    if (touchPref) {
+      $('hintBar').textContent = 'LEFT STICK move/jetpack \u00b7 RIGHT STICK aim + fire \u00b7 \uD83D\uDCA3 grenade \u00b7 \u27F3 reload \u00b7 \u23F8 pause \u00b7 \u26F6 fullscreen';
+    } else {
+      $('hintBar').textContent = 'A/D move \u00b7 W jetpack \u00b7 S fast-fall \u00b7 ARROWS aim \u00b7 SPACE/J or CLICK shoot \u00b7 K grenade \u00b7 R reload \u00b7 TAB scores \u00b7 P pause \u00b7 M mute';
+    }
+  }
+
+  function setupTouchControls() {
+    const t = Input.touch;
+
+    function stick(elId, knobId, onMove, onEnd) {
+      const el = $(elId), knob = $(knobId);
+      let pid = null;
+      function vec(e) {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        let dx = e.clientX - cx, dy = e.clientY - cy;
+        const R = r.width / 2;
+        const len = Math.hypot(dx, dy) || 1;
+        const n = Math.min(1, len / (R * 0.75));
+        dx = (dx / len) * n; dy = (dy / len) * n;
+        knob.style.transform = 'translate(' + (dx * R * 0.55) + 'px,' + (dy * R * 0.55) + 'px)';
+        onMove(dx, dy, n);
+      }
+      el.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        if (pid !== null) return;
+        pid = e.pointerId;
+        try { el.setPointerCapture(pid); } catch (err) { }
+        AudioSys.ensure();
+        vec(e);
+      });
+      el.addEventListener('pointermove', e => {
+        if (e.pointerId !== pid) return;
+        e.preventDefault();
+        vec(e);
+      });
+      const end = e => {
+        if (e.pointerId !== pid) return;
+        pid = null;
+        knob.style.transform = 'translate(0,0)';
+        onEnd();
+      };
+      el.addEventListener('pointerup', end);
+      el.addEventListener('pointercancel', end);
+    }
+
+    // left stick: dx -> A/D, up -> W (jetpack), down -> S (fast fall)
+    stick('stickL', 'knobL',
+      (dx, dy) => {
+        t.mx = dx; t.my = dy;
+        Input.setVirtual('KeyA', dx < -0.3);
+        Input.setVirtual('KeyD', dx > 0.3);
+        Input.setVirtual('KeyW', dy < -0.38);
+        Input.setVirtual('KeyS', dy > 0.55);
+      },
+      () => {
+        t.mx = 0; t.my = 0;
+        ['KeyA', 'KeyD', 'KeyW', 'KeyS'].forEach(c => Input.setVirtual(c, false));
+      }
+    );
+
+    // right stick: aim direction; pushed = fire (Space), like Mini Militia
+    stick('stickR', 'knobR',
+      (dx, dy, n) => {
+        const aiming = n > 0.28;
+        if (aiming) { t.ax = dx; t.ay = dy; }
+        if (aiming !== t.aiming) { t.ax = dx; t.ay = dy; Input.setVirtual('Space', aiming); }
+        t.aiming = aiming;
+      },
+      () => {
+        t.aiming = false;
+        t.ax = 0; t.ay = 0;
+        Input.setVirtual('Space', false);
+      }
+    );
+
+    function button(elId, code, holdable) {
+      const el = $(elId);
+      el.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        AudioSys.ensure();
+        Input.setVirtual(code, true);
+        if (!holdable) setTimeout(() => Input.setVirtual(code, false), 120);
+      });
+      const up = () => { if (holdable) Input.setVirtual(code, false); };
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    }
+    button('btnNade', 'KeyK', false);   // tap = throw
+    button('btnReload', 'KeyR', false); // tap = reload
+    button('btnPause', 'KeyP', false);  // tap = pause/resume
+
+    $('btnFull').addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().then(() => {
+            try { screen.orientation.lock('landscape').catch(() => { }); } catch (err) { }
+          }).catch(() => { });
+        } else document.exitFullscreen();
+      } catch (err) { }
+    });
+
+    $('touchToggle').addEventListener('click', () => {
+      AudioSys.ensure(); AudioSys.click();
+      touchPref = !touchPref;
+      applyTouchMode();
+      fit();
+    });
+
+    // unlock audio on touch, and show controls if a touch happens even without auto-detect
+    window.addEventListener('touchstart', () => AudioSys.ensure(), { passive: true });
+    window.addEventListener('touchend', () => AudioSys.ensure(), { passive: true });
+  }
+
+  fit();
   Input.init(canvas);
+  applyTouchMode();
+  setupTouchControls();
   requestAnimationFrame(frameLoop);
 })();

@@ -7,6 +7,8 @@ Now with **online multiplayer** — host a room, share the code, and play with f
 
 ## Play
 
+**On mobile:** open the site on your phone (landscape recommended). Touch controls switch on automatically — twin sticks like the original: **left stick** moves and fires the jetpack (push up), **right stick** aims and fires while pushed, plus **💣 grenade**, **⟳ reload**, **⏸ pause** and **⛶ fullscreen** buttons. The menu is the same on every device, so you can play on PC and phone alike — even in the same online match.
+
 **Solo / Local:** just open `index.html` in any browser — or serve the folder and open it.
 
 **Host on Vercel (free):**
@@ -43,6 +45,7 @@ Mouse aim + left-click shoot also works.
 - Health, grenade and jetpack-fuel pickups; weapon drop on death
 - One-way platforms + solid cover, respawn protection, slow out-of-combat regen
 - Kill feed, minimap, scoreboard, screen shake, particles, synthesized SFX
+- Mobile/touch support: auto-detected twin-stick controls, full-screen adaptive view, landscape prompt (toggleable from the main menu on any device)
 
 ## Project layout
 

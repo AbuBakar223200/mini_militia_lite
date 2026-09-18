@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05070d">
 <title>Mini Militia Lite</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,7 +34,18 @@
     <div id="deathOverlay" class="hidden"><div id="deathText">RESPAWNING&hellip;</div></div>
 
     <div id="scoreboard" class="hidden"><table id="sbTable"></table></div>
+
+    <div id="touchUI" class="hidden">
+      <div id="stickL" class="stick"><div class="knob" id="knobL"></div></div>
+      <div id="stickR" class="stick"><div class="knob" id="knobR"></div></div>
+      <div id="btnNade" class="tbtn">&#128163;</div>
+      <div id="btnReload" class="tbtn small">&#10227;</div>
+      <div id="btnPause" class="tbtn small topBtn">&#9208;</div>
+      <div id="btnFull" class="tbtn small topBtn leftBtn">&#9974;</div>
+    </div>
   </div>
+
+  <div id="rotateHint"><div>&#128260; Rotate your device to landscape for the best experience</div></div>
 
   <div id="startMenu" class="menu">
     <h1>MINI MILITIA <span>LITE</span></h1>
@@ -63,6 +76,7 @@
       <button id="hostBtn" class="bigBtn alt">&#127760; HOST GAME</button>
       <button id="joinBtn" class="bigBtn alt">&#128279; JOIN GAME</button>
     </div>
+    <button id="touchToggle" class="bigBtn alt tiny">&#128241; TOUCH CONTROLS: AUTO</button>
   </div>
 
   <div id="hostPanel" class="menu hidden">
