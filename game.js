@@ -29,22 +29,47 @@
     vignette.addColorStop(1, 'rgba(0,0,0,0.32)');
   }
 
+  function viewportSize() {
+    const vv = window.visualViewport;
+    if (vv) return { w: Math.round(vv.width), h: Math.round(vv.height) };
+    return {
+      w: document.documentElement.clientWidth || window.innerWidth,
+      h: document.documentElement.clientHeight || window.innerHeight
+    };
+  }
+
+  function safeInsets() {
+    return {
+      t: $('safeProbeT') ? $('safeProbeT').offsetHeight : 0,
+      b: $('safeProbeB') ? $('safeProbeB').offsetHeight : 0,
+      l: $('safeProbeL') ? $('safeProbeL').offsetWidth : 0,
+      r: $('safeProbeR') ? $('safeProbeR').offsetWidth : 0
+    };
+  }
+
   function fit() {
-    const ww = Math.max(320, window.innerWidth), wh = Math.max(320, window.innerHeight);
+    const vp = viewportSize();
+    const sa = safeInsets();
+    const availW = Math.max(320, vp.w - sa.l - sa.r);
+    const availH = Math.max(320, vp.h - sa.t - sa.b);
     const h = touchPref ? 720 : 900;
-    const w = clamp(Math.round(h * ww / wh), 780, 1920);
+    const w = clamp(Math.round(h * availW / availH), 780, 1920);
     VIEW.w = w; VIEW.h = h;
     VIEW.rs = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(w * VIEW.rs);
     canvas.height = Math.round(h * VIEW.rs);
     wrap.style.width = w + 'px';
     wrap.style.height = h + 'px';
-    const s = Math.min(ww / w, wh / h);
-    wrap.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+    const s = Math.min(availW / w, availH / h);
+    wrap.style.left = Math.round(sa.l + (availW - w * s) / 2) + 'px';
+    wrap.style.top = Math.round(sa.t + (availH - h * s) / 2) + 'px';
+    wrap.style.transform = 'scale(' + s + ')';
     createGradients();
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', () => setTimeout(fit, 120));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
+  window.addEventListener('fullscreenchange', () => setTimeout(fit, 150));
 
   // ---------- state ----------
   const state = { mode: 'menu', frame: 0, diff: 'normal', shake: 0, aimFrom: 'mouse', hintT: 600, mpBots: 2, mpDiff: 'normal' };
@@ -681,7 +706,8 @@
     ctx.restore();
 
     // crosshair (screen space)
-    if (state.mode === 'playing' && player && player.alive && Net.mode !== 'client' && state.aimFrom === 'mouse') {
+    const mouseLive = (performance.now() - Input.mouse.lastMove < 2500) || Input.mouse.down;
+    if (state.mode === 'playing' && player && player.alive && Net.mode !== 'client' && state.aimFrom === 'mouse' && mouseLive) {
       const mx = Input.mouse.x, my = Input.mouse.y;
       ctx.strokeStyle = 'rgba(255,255,255,0.9)';
       ctx.lineWidth = 1.5;
