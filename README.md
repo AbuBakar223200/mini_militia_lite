@@ -23,7 +23,14 @@ Now with **online multiplayer** — host a room, share the code, and play with f
 3. Host picks bot count + difficulty and hits **START MATCH**.
 4. The host's browser runs the match simulation; everyone else streams the action and sends inputs (peer-to-peer WebRTC data channels — no game server required).
 
-> Players connect through PeerJS's free public broker, then talk directly to the host. For best results the host needs a reasonably stable connection. Works on the same network and across the internet (NAT traversal via the broker's STUN; most home networks connect fine).
+> Players connect through PeerJS's free public broker, then talk directly to the host. STUN + public TURN relays are configured, so most networks (including phones on mobile data) connect. For best results the host needs a reasonably stable connection.
+
+## Multiplayer troubleshooting
+
+- A small **NET status chip** appears under your health bar in online matches. `HOSTING <code> · 2P` (host) or `MP · 0.1s` (client, snapshot age) = healthy. **`MP · NO SIGNAL`** / **STALLED** blinking red = the stream from the host stopped.
+- **Stuck on "Connecting…"**: the host's screen must be ON and the game page open; check the room code.
+- **"MP · NO SIGNAL" after joining**: the peer connection couldn't punch through the network. Host and joiner on the same Wi-Fi always works — try that first.
+- **Host on a phone**: keep the phone unlocked and the tab visible — locking the screen pauses the whole match for everyone.
 
 ## Controls
 

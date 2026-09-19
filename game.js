@@ -70,6 +70,7 @@
   window.addEventListener('orientationchange', () => setTimeout(fit, 120));
   if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
   window.addEventListener('fullscreenchange', () => setTimeout(fit, 150));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fit, 60); });
 
   // ---------- state ----------
   const state = { mode: 'menu', frame: 0, diff: 'normal', shake: 0, aimFrom: 'mouse', hintT: 600, mpBots: 2, mpDiff: 'normal' };
@@ -522,6 +523,7 @@
     $('weaponText').textContent = w.name;
     $('ammoText').textContent = self.reloading ? 'RELOADING' : self.ammo + ' / ' + w.ammo;
     $('grenText').textContent = '\u2726 ' + self.grenades;
+    if (G.frame % 15 === 0) updateNetChip();
 
     if (G.frame % 10 === 0) {
       const sorted = [...view.bodies].sort((a, b) => b.score - a.score);
@@ -545,6 +547,23 @@
   }
 
   // ---------- HUD ----------
+  function updateNetChip() {
+    const chip = $('netChip');
+    if (Net.mode === 'off') { chip.classList.add('hidden'); return; }
+    chip.classList.remove('hidden');
+    const d = Net.debugInfo();
+    let txt = '', bad = false;
+    if (d.mode === 'host') {
+      txt = 'HOSTING ' + d.code.toUpperCase() + ' \u00b7 ' + d.players + 'P';
+      if (d.players > 1 && d.lastInAgo > 4) { txt += ' \u00b7 STALLED'; bad = true; }
+    } else if (d.mode === 'client') {
+      if (d.snapAgo < 0 || d.snapAgo > 4) { txt = 'MP \u00b7 NO SIGNAL'; bad = true; }
+      else txt = 'MP \u00b7 ' + d.snapAgo.toFixed(1) + 's';
+    }
+    chip.textContent = txt;
+    chip.classList.toggle('bad', bad);
+  }
+
   function updateHUD() {
     const w = WEAPONS[player.weapon];
     $('healthFill').style.width = clamp(player.hp, 0, 100) + '%';
@@ -552,6 +571,7 @@
     $('weaponText').textContent = w.name;
     $('ammoText').textContent = player.reloading ? 'RELOADING' : player.ammo + ' / ' + w.ammo;
     $('grenText').textContent = '\u2726 ' + player.grenades;
+    if (G.frame % 15 === 0) updateNetChip();
 
     if (G.frame % 10 === 0) {
       const sorted = [...G.bodies].sort((a, b) => b.score - a.score);
@@ -869,6 +889,10 @@
       $('joinStatus').textContent = 'In room (' + players.length + ' players) \u2014 waiting for the host to start\u2026';
     },
     onStart() { clientStartMatch(); },
+    onStall(on) {
+      $('mpBanner').textContent = on ? 'CONNECTION STALLED \u2014 trying to recover\u2026' : '';
+      $('mpBanner').classList.toggle('hidden', !on);
+    },
     onDropped() {
       toMenu();
       $('mpBanner').textContent = 'Disconnected from host';

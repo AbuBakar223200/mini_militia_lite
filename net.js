@@ -16,14 +16,31 @@ const Net = (function () {
   let nextId = 1;
   let hostConn = null;
   let myId = 0, myName = '', myColor = COLORS[0];
-  let snapA = null, snapB = null, snapBAt = 0;
+  let snapA = null, snapB = null, snapBAt = 0, lastSnapAt = 0;
   let pendingEv = [];
   let myInput = { l: 0, r: 0, j: 0, d: 0, s: 0, a: 0, f: 1, cs: 0, cg: 0, cr: 0 };
-  let sentAt = 0;
+  let sentAt = 0, joinT0 = 0, stallWarned = false;
   let roster = []; // [{id,name,color}]
   let currentView = null;
   let retries = 0;
   let ui = {}; // callbacks provided by game.js
+
+  // STUN for NAT discovery; public TURN relays so players on strict networks
+  // (e.g. phone on mobile data vs PC on home Wi-Fi) can still connect.
+  const PEER_CONFIG = {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ]
+    }
+  };
+  const JOIN_TIMEOUT_MS = 12000;
 
   function esc(s) { return String(s || '').replace(/[<>&"]/g, '').slice(0, 12); }
   function makeCode() {
@@ -54,8 +71,9 @@ const Net = (function () {
 
   function createPeer() {
     code = makeCode();
-    peer = new Peer(PREFIX + code, { debug: 0 });
+    peer = new Peer(PREFIX + code, PEER_CONFIG);
     peer.on('open', () => { mode = 'host'; ui.onHostReady(code, roster); });
+    peer.on('disconnected', () => { try { if (mode === 'host' || mode === 'hosting') peer.reconnect(); } catch (e) { } });
     peer.on('connection', conn => {
       conn.on('data', d => onDataHost(conn, d));
       conn.on('close', () => dropClient(conn));
@@ -200,14 +218,18 @@ const Net = (function () {
     myName = esc(name) || 'Player';
     mode = 'joining';
     snapA = snapB = null; pendingEv = []; currentView = null;
+    lastSnapAt = 0; stallWarned = false;
+    joinT0 = performance.now();
     countersReset();
-    peer = new Peer({ debug: 0 });
+    peer = new Peer(PEER_CONFIG);
     peer.on('open', () => {
       hostConn = peer.connect(PREFIX + String(codeIn || '').trim().toLowerCase(), { reliable: true });
       hostConn.on('open', () => hostConn.send({ t: 'hi', name: myName }));
       hostConn.on('data', d => onDataClient(d));
       hostConn.on('close', () => { if (mode === 'client' || mode === 'joining') { ui.onDropped(); reset(); } });
+      hostConn.on('error', () => { if (mode === 'client' || mode === 'joining') { ui.onDropped(); reset(); } });
     });
+    peer.on('disconnected', () => { try { if (mode === 'joining' || mode === 'client') peer.reconnect(); } catch (e) { } });
     peer.on('error', err => { ui.onError(errText(err)); reset(); });
   }
 
@@ -219,6 +241,7 @@ const Net = (function () {
     if (d.t === 'wc') {
       myId = d.id; myColor = d.color;
       mode = 'client';
+      lastSnapAt = performance.now();
       ui.onJoined();
     } else if (d.t === 'lb') {
       ui.onLobby(d.p, d.bots);
@@ -232,17 +255,28 @@ const Net = (function () {
       snapA = snapB;
       snapB = d;
       snapBAt = performance.now();
+      lastSnapAt = snapBAt;
       if (d.e && d.e.length) pendingEv.push(...d.e);
     } else if (d.t === 'ev') {
       if (d.e && d.e.length) pendingEv.push(...d.e);
+      lastSnapAt = performance.now();
     } else if (d.t === 'pa') {
       ui.onPause(d.on);
     }
   }
 
+  // watchdog: join timeout + stalled-stream warning
   function clientTick() {
-    if (mode !== 'client') return;
     const now = performance.now();
+    if (mode === 'joining' && now - joinT0 > JOIN_TIMEOUT_MS) {
+      ui.onError('Could not reach the host. Check the code, make sure the host screen is on, or try the same Wi-Fi.');
+      reset();
+      return;
+    }
+    if (mode !== 'client') return;
+    const snapAge = lastSnapAt ? (now - lastSnapAt) / 1000 : -1;
+    if (snapAge > 5 && !stallWarned) { stallWarned = true; ui.onStall(true); }
+    else if (snapAge >= 0 && snapAge < 1 && stallWarned) { stallWarned = false; ui.onStall(false); }
     if (now - sentAt < INPUT_MS) return;
     sentAt = now;
     try { hostConn.send({ t: 'in', ...myInput }); } catch (e) { }
@@ -349,16 +383,29 @@ const Net = (function () {
     try { if (peer) peer.destroy(); } catch (e) { }
     peer = null; hostConn = null; conns = [];
     snapA = snapB = null; pendingEv = []; currentView = null;
+    lastSnapAt = 0; stallWarned = false;
   }
 
   function leave() { reset(); }
+
+  function debugInfo() {
+    const now = performance.now();
+    if (mode === 'host') {
+      const lastIn = conns.length && conns[0].lastInAt ? (now - conns[0].lastInAt) / 1000 : -1;
+      return { mode, code, players: conns.length + 1, lastInAgo: lastIn };
+    }
+    if (mode === 'client') {
+      return { mode, snapAgo: lastSnapAt ? (now - lastSnapAt) / 1000 : -1 };
+    }
+    return { mode };
+  }
 
   return {
     host, join, leave,
     hostTick, applyInputs, broadcastGo, broadcastEvent, sendLobby,
     clientTick, clientSendInput: input => { myInput = input; },
     requestRestart,
-    updateView, drainEvents, rosterName,
+    updateView, drainEvents, rosterName, debugInfo,
     get view() { return currentView; },
     get mode() { return mode; },
     get myId() { return myId; },

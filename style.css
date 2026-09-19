@@ -95,6 +95,10 @@ body.touchOn #touchUI>*{pointer-events:auto}
 @media (orientation:portrait){body.touchOn #rotateHint{display:flex}}
 .bigBtn.tiny{font-size:13px;padding:9px 22px;letter-spacing:1px}
 
+#netChip{position:absolute;top:118px;left:16px;background:rgba(8,14,26,.7);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:#9fe3a0;letter-spacing:.5px}
+#netChip.bad{color:#ff8a80;border-color:rgba(255,138,128,.6);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.55}}
+
 /* safe-area probes: measure notch / home-indicator insets in JS */
 #safeProbeT{position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none}
 #safeProbeB{position:fixed;bottom:0;left:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none}
