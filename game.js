@@ -82,6 +82,7 @@
   const G = {
     frame: 0,
     bodies: [], bullets: [], grenades: [], pickups: [], particles: [], floaters: [], events: [],
+    hitFlash: 0,
     clouds: CLOUDS.map(c => ({ ...c })),
     explode, sparks, burst, jetSmoke, floatText, addFeed, addShake, checkWin, dropWeapon,
   };
@@ -155,6 +156,13 @@
     burst(x, y, 26, '#ffcc80', 5.5, 40, 0.06, 4);
     burst(x, y, 18, '#b0bec5', 3.5, 55, -0.02, 5);
     burst(x, y, 12, '#fff59d', 7, 18, 0.02, 2.5);
+    // fireball bloom, hot core glows and a shockwave ring
+    G.particles.push({ x, y, vx: 0, vy: 0, grav: 0, life: 14, maxLife: 14, color: '#ffb74d', size: 190, add: true });
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 3.5;
+      G.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, grav: 0, life: 16 + Math.random() * 10, maxLife: 24, color: Math.random() < 0.5 ? '#ff9800' : '#ffcc80', size: 26 + Math.random() * 22, add: true });
+    }
+    G.particles.push({ x, y, r: 10, vr: 6.5, life: 18, maxLife: 18, ring: true });
     addShake(12);
     AudioSys.explode();
   }
@@ -348,7 +356,7 @@
     G.grenades = G.grenades.filter(g => !g.dead);
     for (const p of G.pickups) p.update(G.frame);
     G.pickups = G.pickups.filter(p => !p.dead);
-    for (const p of G.particles) { p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--; }
+    for (const p of G.particles) { p.x += p.vx; p.y += p.vy; p.vy += p.grav; if (p.vr) p.r += p.vr; p.life--; }
     G.particles = G.particles.filter(p => p.life > 0);
     for (const f of G.floaters) { f.y -= 0.7; f.t--; }
     G.floaters = G.floaters.filter(f => f.t > 0);
@@ -356,6 +364,7 @@
       c.x += c.v * 0.4;
       if (c.x > WORLD.w + 400) c.x = -400;
     }
+    G.hitFlash *= 0.85;
 
     // camera
     const leadX = Math.cos(player.aimAngle) * 50;
@@ -383,7 +392,7 @@
     clientControl(view ? view.self : null);
     processClientEvents();
 
-    for (const p of G.particles) { p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--; }
+    for (const p of G.particles) { p.x += p.vx; p.y += p.vy; p.vy += p.grav; if (p.vr) p.r += p.vr; p.life--; }
     G.particles = G.particles.filter(p => p.life > 0);
     for (const f of G.floaters) { f.y -= 0.7; f.t--; }
     G.floaters = G.floaters.filter(f => f.t > 0);
@@ -391,6 +400,7 @@
       c.x += c.v * 0.4;
       if (c.x > WORLD.w + 400) c.x = -400;
     }
+    G.hitFlash *= 0.85;
     if (view) {
       for (const b of view.bodies) {
         if (b.jetting && b.alive && Math.random() < 0.55) G.jetSmoke(b.cx - b.facing * 9, b.cy + 4, b.facing);
@@ -455,6 +465,8 @@
       } else if (ev.t === 'b') {
         G.burst(ev.x, ev.y, 26, '#ffcc80', 5.5, 40, 0.06, 4);
         G.burst(ev.x, ev.y, 14, '#b0bec5', 3.5, 55, -0.02, 5);
+        G.particles.push({ x: ev.x, y: ev.y, vx: 0, vy: 0, grav: 0, life: 14, maxLife: 14, color: '#ffb74d', size: 190, add: true });
+        G.particles.push({ x: ev.x, y: ev.y, r: 10, vr: 6.5, life: 18, maxLife: 18, ring: true });
         G.addShake(12);
         AudioSys.explode();
       } else if (ev.t === 'k') {
@@ -597,34 +609,25 @@
   // ---------- rendering ----------
   let skyGrad = null, vignette = null;
 
-  function drawHills(parallax, baseY, amp, color, seed) {
-    const ox = cam.x * parallax;
-    const oy = cam.y * parallax * 0.5;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, VIEW.h);
-    for (let x = 0; x <= VIEW.w; x += 32) {
-      const wx = x + ox;
-      const y = baseY - oy + Math.sin(wx * 0.004 + seed) * amp + Math.sin(wx * 0.011 + seed * 2) * amp * 0.45;
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(VIEW.w, VIEW.h);
-    ctx.closePath();
-    ctx.fill();
-  }
-
   function drawClouds(now) {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     for (const c of G.clouds) {
       let x = c.x - cam.x * 0.25 - now * 0.004 * c.v;
       const span = WORLD.w + 800;
       x = ((x % span) + span) % span - 400;
       const y = c.y - cam.y * 0.15;
-      ctx.beginPath();
-      ctx.arc(x, y, 26 * c.s, 0, Math.PI * 2);
-      ctx.arc(x + 24 * c.s, y - 10 * c.s, 20 * c.s, 0, Math.PI * 2);
-      ctx.arc(x + 48 * c.s, y, 24 * c.s, 0, Math.PI * 2);
-      ctx.fill();
+      const s = c.s;
+      const puff = (px, py, col) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(px, py, 26 * s, 0, Math.PI * 2);
+        ctx.arc(px + 24 * s, py - 10 * s, 20 * s, 0, Math.PI * 2);
+        ctx.arc(px + 48 * s, py, 24 * s, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      puff(x + 4, y + 7, 'rgba(130,160,195,0.28)');
+      puff(x, y, 'rgba(255,255,255,0.93)');
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath(); ctx.ellipse(x + 24 * s, y + 8 * s, 40 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -634,18 +637,13 @@
     // sky
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, VIEW.w, VIEW.h);
-    // sun
-    ctx.save();
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = '#fff59d';
-    ctx.beginPath(); ctx.arc(VIEW.w - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 70, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#fff9c4';
-    ctx.beginPath(); ctx.arc(VIEW.w - 180 - cam.x * 0.05, 110 - cam.y * 0.05, 44, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    // sun with bloom
+    const sunX = VIEW.w - 180 - cam.x * 0.05, sunY = 110 - cam.y * 0.05;
+    Scenery.glow(ctx, sunX, sunY, 150, '#fff59d', 0.5);
+    ctx.fillStyle = '#fffde7';
+    ctx.beginPath(); ctx.arc(sunX, sunY, 40, 0, Math.PI * 2); ctx.fill();
     drawClouds(now);
-    drawHills(0.25, VIEW.h * 0.62, 55, '#b7d9a8', 1.7);
-    drawHills(0.45, VIEW.h * 0.78, 75, '#93c47d', 4.2);
+    Scenery.drawScenery(ctx, cam, VIEW.h);
 
     // world space
     const sx = (Math.random() * 2 - 1) * state.shake;
@@ -656,23 +654,11 @@
     const view = Net.mode === 'client' ? Net.view : null;
     const V = view || { bodies: G.bodies, bullets: G.bullets, grenades: G.grenades, pickups: G.pickups };
 
-    for (const p of PLATFORMS) {
-      if (p.solid) {
-        ctx.fillStyle = '#6d4c41';
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.fillStyle = '#8d6e63';
-        ctx.fillRect(p.x, p.y, p.w, 6);
-        ctx.fillStyle = '#5d4037';
-        ctx.fillRect(p.x, p.y + p.h - 6, p.w, 6);
-      } else {
-        ctx.fillStyle = '#795548';
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.fillStyle = '#66bb6a';
-        ctx.fillRect(p.x, p.y, p.w, 7);
-        ctx.fillStyle = '#43a047';
-        ctx.fillRect(p.x, p.y + 7, p.w, 3);
-      }
-    }
+    // pre-rendered world (platforms, ground, decor, baked shadows)
+    ctx.drawImage(Scenery.layers.world, 0, 0);
+
+    // dynamic shadows under everything alive
+    for (const b of V.bodies) if (b.alive) Scenery.bodyShadow(ctx, b);
 
     for (const p of V.pickups) p.draw(ctx, G.frame);
     for (const g of V.grenades) g.draw(ctx);
@@ -680,9 +666,20 @@
     if (Net.mode !== 'client' && player) player.draw(ctx);
     for (const b of V.bullets) b.draw(ctx);
 
-    // particles
+    // particles (soft squares, additive glows, shockwave rings)
     for (const p of G.particles) {
-      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      const t = Math.max(0, p.life / p.maxLife);
+      if (p.ring) {
+        ctx.strokeStyle = 'rgba(255,213,128,' + (t * 0.85).toFixed(3) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+        continue;
+      }
+      if (p.add) {
+        Scenery.glow(ctx, p.x, p.y, p.size * (0.4 + t * 0.6), p.color, t * 0.9);
+        continue;
+      }
+      ctx.globalAlpha = t;
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     }
@@ -746,22 +743,36 @@
     if (state.mode === 'playing' && matchT < 110) {
       const a = 1 - matchT / 110;
       ctx.globalAlpha = a;
+      ctx.save();
+      ctx.shadowColor = 'rgba(66,165,243,0.9)';
+      ctx.shadowBlur = 30;
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 84px Segoe UI, sans-serif';
       ctx.textAlign = 'center';
-      ctx.strokeStyle = 'rgba(20,40,80,0.8)';
+      ctx.strokeStyle = 'rgba(20,40,80,0.85)';
       ctx.lineWidth = 8;
       ctx.strokeText('FIGHT!', VIEW.w / 2, VIEW.h / 2 - 30);
       ctx.fillText('FIGHT!', VIEW.w / 2, VIEW.h / 2 - 30);
+      ctx.restore();
       ctx.font = '600 22px Segoe UI, sans-serif';
       ctx.fillStyle = '#e3f2fd';
       ctx.fillText('FIRST TO ' + KILL_LIMIT + ' KILLS', VIEW.w / 2, VIEW.h / 2 + 16);
       ctx.globalAlpha = 1;
     }
 
-    // vignette
+    // vignette + damage feedback
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, VIEW.w, VIEW.h);
+    const hurt = Math.min(1, (G.hitFlash || 0) / 8);
+    const lowHp = player && player.alive && player.hp < 30 ? 0.12 + 0.08 * Math.sin(now * 0.012) : 0;
+    const redA = Math.max(hurt * 0.4, lowHp);
+    if (redA > 0.01) {
+      const rg = ctx.createRadialGradient(VIEW.w / 2, VIEW.h / 2, VIEW.h * 0.3, VIEW.w / 2, VIEW.h / 2, VIEW.h * 0.85);
+      rg.addColorStop(0, 'rgba(180,20,20,0)');
+      rg.addColorStop(1, 'rgba(180,20,20,' + redA.toFixed(3) + ')');
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, VIEW.w, VIEW.h);
+    }
 
     // minimap
     if (state.mode !== 'menu') drawMinimap(V);
