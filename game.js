@@ -342,7 +342,12 @@
     if (state.mode === 'menu' && Net.mode === 'off' && !inMenuWidget && Input.pressed('Enter')) startGame(selectedDiff);
     else if (state.mode === 'over' && !mpClient && (Net.mode === 'off' || Net.mode === 'host') && !inMenuWidget && Input.pressed('Enter')) startGame(state.diff);
 
-    if (state.mode !== 'playing') { Input.endFrame(); return; }
+    if (state.mode !== 'playing') {
+      // while paused the host still streams snapshots so clients don't flag a stall
+      if (state.mode === 'paused' && Net.mode === 'host') Net.hostTick();
+      Input.endFrame();
+      return;
+    }
 
     if (mpClient) { clientUpdate(); Input.endFrame(); return; }
 
@@ -669,7 +674,9 @@
 
     for (const p of V.pickups) p.draw(ctx, G.frame);
     for (const g of V.grenades) g.draw(ctx);
-    for (const b of V.bodies) if (!b.isPlayer) b.draw(ctx);
+    // on a client, every body is a remote ghost (including "you") — draw them all;
+    // the isPlayer skip only applies to the locally simulated player on host/solo.
+    for (const b of V.bodies) if (!b.isPlayer || Net.mode === 'client') b.draw(ctx);
     if (Net.mode !== 'client' && player) player.draw(ctx);
     for (const b of V.bullets) b.draw(ctx);
 
