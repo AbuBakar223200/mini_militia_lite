@@ -909,6 +909,11 @@
       $('joinStatus').style.color = '#a9c1e0';
       $('joinStatus').textContent = 'Connected! Waiting for the host to start\u2026';
     },
+    onJoinState(txt) {
+      // live ICE progress while the join panel is open
+      $('joinStatus').style.color = '#a9c1e0';
+      $('joinStatus').textContent = txt;
+    },
     onLobby(players) {
       $('joinStatus').style.color = '#a9c1e0';
       $('joinStatus').textContent = 'In room (' + players.length + ' players) \u2014 waiting for the host to start\u2026';

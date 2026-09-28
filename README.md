@@ -29,7 +29,8 @@ Now with **online multiplayer** — host a room, share the code, and play with f
 
 - A small **NET status chip** appears under your health bar in online matches. `HOSTING <code> · 2P` (host) or `MP · 0.1s` (client, snapshot age) = healthy. **`MP · NO SIGNAL`** / **STALLED** blinking red = the stream from the host stopped.
 - **Joining:** type the room code and press **ENTER** (or the keyboard's Go key) — that connects. If it fails, the join panel stays open with the reason and the button turns into **TRY AGAIN**. A failed join never dumps you into a solo game.
-- **Stuck on "Connecting…"**: the host's screen must be ON and the game page open; check the room code. Hiccups from the free public matchmaking service are retried automatically a couple of times.
+- **Stuck on "Connecting…"**: the host's screen must be ON and the game page open; check the room code. The status line shows live progress (`punching through NAT…` = the relay handshake is running). Hiccups from the free public matchmaking service and relay failures are retried automatically.
+- **Different networks (Wi-Fi vs mobile data)**: connections go through a free public TURN relay (openrelay.metered.ca). Carrier networks sit behind CGNAT, so the relay is mandatory there — if it's overloaded the join can fail; switching the mobile device to Wi-Fi (either side) is the reliable fallback. To use your own TURN server, edit `PEER_CONFIG` in `net.js`.
 - **"MP · NO SIGNAL" after joining**: the stream from the host stopped — usually the host's screen locked or the tab went to the background. The host's browser must stay visible while hosting.
 - **Host on a phone**: keep the phone unlocked and the tab visible — locking the screen pauses the whole match for everyone.
 

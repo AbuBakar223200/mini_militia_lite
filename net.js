@@ -33,10 +33,12 @@ const Net = (function () {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
         { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
         { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+        { urls: 'turn:openrelay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
       ]
     }
   };
@@ -44,6 +46,8 @@ const Net = (function () {
 
   let joinRetries = 0;
   let joinCode = '';
+  let joinGraceUsed = false;   // one-time timeout extension while ICE is still actively checking
+  let lastJoinState = '';
 
   // the free public broker sometimes hiccups — these errors are worth a retry
   function isBrokerError(t) {
@@ -233,6 +237,8 @@ const Net = (function () {
     joinT0 = performance.now();
     countersReset();
     joinRetries = 0;
+    joinGraceUsed = false;
+    lastJoinState = '';
     joinCode = String(codeIn || '').trim().toLowerCase();
     if (navigator.onLine === false) {
       ui.onError('You appear to be offline. Check your internet connection, then try again.');
@@ -301,10 +307,14 @@ const Net = (function () {
   // watchdog: join timeout + stalled-stream warning
   function clientTick() {
     const now = performance.now();
-    if (mode === 'joining' && now - joinT0 > JOIN_TIMEOUT_MS) {
-      ui.onError('Could not reach the host. Double-check the code, make sure the host\u2019s screen is on with the game open, then press TRY AGAIN.');
-      reset();
-      return;
+    if (mode === 'joining') {
+      joinProgress(now);
+      if (now - joinT0 > JOIN_TIMEOUT_MS) {
+        ui.onError('Could not reach the host. Check the code and that the host is on the game screen. '
+          + 'Across different networks (Wi-Fi vs mobile data) the relay path can be blocked \u2014 joining from Wi-Fi usually works.');
+        reset();
+        return;
+      }
     }
     if (mode !== 'client') return;
     const snapAge = lastSnapAt ? (now - lastSnapAt) / 1000 : -1;
@@ -317,6 +327,33 @@ const Net = (function () {
 
   function requestRestart() {
     if (mode === 'client' && hostConn) { try { hostConn.send({ t: 'rr' }); } catch (e) { } }
+  }
+
+  // Surface what the ICE layer is doing while joining: extend the deadline while
+  // the relay handshake is still making progress, retry once if it outright fails.
+  function joinProgress(now) {
+    const pc = hostConn && hostConn.peerConnection;
+    const st = pc ? pc.iceConnectionState : null;
+    if ((st === 'checking' || st === 'connected' || st === 'completed') && !joinGraceUsed
+        && now - joinT0 > JOIN_TIMEOUT_MS - 4000) {
+      // relayed handshakes across carrier NAT are slow — one extra window, not a hard kill
+      joinGraceUsed = true;
+      joinT0 = now - (JOIN_TIMEOUT_MS - 12000);
+    }
+    if (st === 'failed' && joinRetries < 2) {
+      joinRetries++;
+      try { peer.destroy(); } catch (e) { }
+      startJoinPeer();
+      return;
+    }
+    let txt = 'Connecting\u2026';
+    if (st === 'checking') txt = 'Connecting\u2026 punching through NAT, this can take a few seconds';
+    else if (st === 'connected' || st === 'completed') txt = 'Connecting\u2026 almost there';
+    else if (st === 'disconnected') txt = 'Connecting\u2026 network hiccup, retrying';
+    if (txt !== lastJoinState && typeof ui.onJoinState === 'function') {
+      lastJoinState = txt;
+      ui.onJoinState(txt);
+    }
   }
 
   // ---------------- client-side view (interpolated ghosts) ----------------
