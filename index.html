@@ -75,7 +75,7 @@
     </div>
     <button id="playBtn" class="bigBtn">&#9654; PLAY SOLO</button>
     <div class="mpDivider"><span>OR PLAY ONLINE WITH FRIENDS</span></div>
-    <input id="nameInput" class="mpInput" placeholder="Your name" maxlength="12" autocomplete="off">
+    <input id="nameInput" class="mpInput" placeholder="Your name" maxlength="12" autocomplete="off" enterkeyhint="next">
     <div class="mpRow">
       <button id="hostBtn" class="bigBtn alt">&#127760; HOST GAME</button>
       <button id="joinBtn" class="bigBtn alt">&#128279; JOIN GAME</button>
@@ -87,6 +87,7 @@
     <h2>HOSTING A ROOM</h2>
     <p class="tag">Share this code with your friends:</p>
     <div id="roomCode" class="roomCode">-----</div>
+    <div id="hostStatus" class="tag"></div>
     <div class="lobbyBox">
       <div class="lobbyTitle">PLAYERS</div>
       <div id="lobbyList" class="lobbyList"></div>
@@ -111,7 +112,7 @@
 
   <div id="joinPanel" class="menu hidden">
     <h2>JOIN A ROOM</h2>
-    <input id="codeInput" class="mpInput codeInput" placeholder="ROOM CODE" maxlength="5" autocomplete="off">
+    <input id="codeInput" class="mpInput codeInput" placeholder="ROOM CODE" maxlength="5" autocomplete="off" autocapitalize="none" enterkeyhint="go">
     <button id="connectBtn" class="bigBtn">CONNECT</button>
     <div id="joinStatus" class="tag"></div>
     <button id="joinBackBtn" class="bigBtn alt">BACK</button>

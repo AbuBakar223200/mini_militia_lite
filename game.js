@@ -233,6 +233,8 @@
     $('pauseMenu').classList.add('hidden');
     $('endMenu').classList.add('hidden');
     $('deathOverlay').classList.add('hidden');
+    $('joinPanel').classList.add('hidden');
+    $('hostPanel').classList.add('hidden');
     $('startMenu').classList.remove('hidden');
   }
 
@@ -332,8 +334,13 @@
     if (!mpClient && (Input.pressed('Escape') || Input.pressed('KeyP'))) {
       if (state.mode === 'playing' || state.mode === 'paused') pauseToggle();
     }
-    if (state.mode === 'menu' && Input.pressed('Enter')) startGame(selectedDiff);
-    else if (state.mode === 'over' && !mpClient && Input.pressed('Enter')) startGame(state.diff);
+    // Enter is a menu shortcut only when the player isn't typing/clicking in a
+    // menu panel, and never while a multiplayer session is active — otherwise
+    // pressing Enter in the room-code box would launch a solo game mid-join.
+    const ae = document.activeElement;
+    const inMenuWidget = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'BUTTON');
+    if (state.mode === 'menu' && Net.mode === 'off' && !inMenuWidget && Input.pressed('Enter')) startGame(selectedDiff);
+    else if (state.mode === 'over' && !mpClient && (Net.mode === 'off' || Net.mode === 'host') && !inMenuWidget && Input.pressed('Enter')) startGame(state.diff);
 
     if (state.mode !== 'playing') { Input.endFrame(); return; }
 
@@ -912,10 +919,17 @@
     },
     onError(msg) {
       if (state.mode === 'menu') {
-        $('startMenu').classList.remove('hidden');
-        $('hostPanel').classList.add('hidden');
-        $('joinPanel').classList.remove('hidden');
-        mpFail(msg);
+        // Keep the panel the player was on; don't yank them into the join panel.
+        if (!$('hostPanel').classList.contains('hidden')) {
+          $('hostStatus').textContent = msg;
+          $('hostStatus').style.color = '#ff8a80';
+        } else {
+          $('startMenu').classList.remove('hidden');
+          $('hostPanel').classList.add('hidden');
+          $('joinPanel').classList.remove('hidden');
+          mpFail(msg);
+          $('connectBtn').textContent = 'TRY AGAIN';
+        }
       } else {
         $('mpBanner').textContent = msg;
         $('mpBanner').classList.remove('hidden');
@@ -934,6 +948,7 @@
     $('startMenu').classList.add('hidden');
     $('hostPanel').classList.remove('hidden');
     $('roomCode').textContent = '\u2026';
+    $('hostStatus').textContent = '';
   });
   $('joinBtn').addEventListener('click', () => {
     AudioSys.ensure(); AudioSys.click();
@@ -942,7 +957,20 @@
     $('joinPanel').classList.remove('hidden');
     $('joinStatus').style.color = '#a9c1e0';
     $('joinStatus').textContent = 'Enter the room code.';
+    $('connectBtn').textContent = 'CONNECT';
     $('codeInput').value = '';
+    setTimeout(() => $('nameInput').blur(), 0);
+  });
+  // Enter in the name box moves to the code box; Enter in the code box connects.
+  $('nameInput').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); e.stopPropagation();
+    $('codeInput').focus();
+  });
+  $('codeInput').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); e.stopPropagation();
+    $('connectBtn').click();
   });
   $('connectBtn').addEventListener('click', () => {
     AudioSys.ensure(); AudioSys.click();
@@ -951,6 +979,7 @@
     $('joinStatus').style.color = '#a9c1e0';
     $('joinStatus').textContent = 'Connecting\u2026';
     Net.join(codeIn, $('nameInput').value, mpUi);
+    $('codeInput').blur(); // drop the on-screen keyboard so the status stays visible
   });
   $('startMpBtn').addEventListener('click', () => { AudioSys.click(); startGame(state.mpDiff); });
   $('hostBackBtn').addEventListener('click', () => { AudioSys.click(); Net.leave(); toMenu(); });

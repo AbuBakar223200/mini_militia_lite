@@ -10,6 +10,9 @@ const Input = (function () {
   function init(canvas) {
     cv = canvas;
     window.addEventListener('keydown', e => {
+      // Don't hijack keys typed into menu text fields (name, room code).
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
       if (!keys.has(e.code)) just.add(e.code);
       keys.add(e.code);

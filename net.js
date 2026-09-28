@@ -40,7 +40,15 @@ const Net = (function () {
       ]
     }
   };
-  const JOIN_TIMEOUT_MS = 12000;
+  const JOIN_TIMEOUT_MS = 15000;
+
+  let joinRetries = 0;
+  let joinCode = '';
+
+  // the free public broker sometimes hiccups — these errors are worth a retry
+  function isBrokerError(t) {
+    return t === 'network' || t === 'socket-error' || t === 'socket-closed' || t === 'server-error';
+  }
 
   function esc(s) { return String(s || '').replace(/[<>&"]/g, '').slice(0, 12); }
   function makeCode() {
@@ -52,7 +60,7 @@ const Net = (function () {
   function errText(e) {
     if (e && e.type === 'peer-unavailable') return 'Room not found. Check the code.';
     if (e && e.type === 'unavailable-id') return 'Could not create room, try again.';
-    if (e && e.type === 'network') return 'Cannot reach the matchmaking service. Are you online?';
+    if (e && e.type === 'network') return 'Cannot reach the matchmaking service. Check your internet, then TRY AGAIN.';
     return 'Connection error: ' + (e && e.type ? e.type : e);
   }
 
@@ -80,12 +88,15 @@ const Net = (function () {
       conn.on('error', () => dropClient(conn));
     });
     peer.on('error', err => {
-      if (err.type === 'unavailable-id' && mode === 'hosting' && retries < 3) {
+      const t = err && err.type;
+      if (t === 'unavailable-id' && mode === 'hosting' && retries < 3) {
         retries++;
         peer.destroy();
         createPeer();
         return;
       }
+      // once in a room, a signaling drop doesn't kill the direct data channels
+      if ((mode === 'host' || mode === 'client') && isBrokerError(t)) return;
       ui.onError(errText(err));
       reset();
     });
@@ -221,16 +232,38 @@ const Net = (function () {
     lastSnapAt = 0; stallWarned = false;
     joinT0 = performance.now();
     countersReset();
+    joinRetries = 0;
+    joinCode = String(codeIn || '').trim().toLowerCase();
+    if (navigator.onLine === false) {
+      ui.onError('You appear to be offline. Check your internet connection, then try again.');
+      reset();
+      return;
+    }
+    startJoinPeer();
+  }
+
+  function startJoinPeer() {
     peer = new Peer(PEER_CONFIG);
     peer.on('open', () => {
-      hostConn = peer.connect(PREFIX + String(codeIn || '').trim().toLowerCase(), { reliable: true });
+      hostConn = peer.connect(PREFIX + joinCode, { reliable: true });
       hostConn.on('open', () => hostConn.send({ t: 'hi', name: myName }));
       hostConn.on('data', d => onDataClient(d));
       hostConn.on('close', () => { if (mode === 'client' || mode === 'joining') { ui.onDropped(); reset(); } });
       hostConn.on('error', () => { if (mode === 'client' || mode === 'joining') { ui.onDropped(); reset(); } });
     });
     peer.on('disconnected', () => { try { if (mode === 'joining' || mode === 'client') peer.reconnect(); } catch (e) { } });
-    peer.on('error', err => { ui.onError(errText(err)); reset(); });
+    peer.on('error', err => {
+      const t = err && err.type;
+      if (mode === 'joining' && isBrokerError(t) && joinRetries < 2) {
+        joinRetries++;
+        try { peer.destroy(); } catch (e) { }
+        startJoinPeer();
+        return;
+      }
+      if ((mode === 'client' || mode === 'host') && isBrokerError(t)) return;
+      ui.onError(errText(err));
+      reset();
+    });
   }
 
   function countersReset() { countersSend.s = 0; countersSend.g = 0; countersSend.r = 0; }
@@ -269,7 +302,7 @@ const Net = (function () {
   function clientTick() {
     const now = performance.now();
     if (mode === 'joining' && now - joinT0 > JOIN_TIMEOUT_MS) {
-      ui.onError('Could not reach the host. Check the code, make sure the host screen is on, or try the same Wi-Fi.');
+      ui.onError('Could not reach the host. Double-check the code, make sure the host\u2019s screen is on with the game open, then press TRY AGAIN.');
       reset();
       return;
     }
